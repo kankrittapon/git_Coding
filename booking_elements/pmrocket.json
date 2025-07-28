@@ -1,0 +1,11 @@
+{
+  "register_button": "#root > div > div.step > div > button",
+  "branch_list": "#root > div > div.step > div > div",
+  "branch_buttons": "#root > div > div.step > div > div",
+  "branch_next_button": "#root > div > div.step > div > button",
+  "calendar_day_button_prefix": "#calendar-grid > button:nth-child(",
+  "time_buttons_prefix": "#root > div > div.step > div > div.button-grid > button:nth-child(",
+  "datetime_next_button": "#root > div > div.step > div > button",
+  "checkbox": "#final-checkbox",
+  "confirm_button": "#root > div > div.step > div > button"
+}

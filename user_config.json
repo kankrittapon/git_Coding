@@ -1,0 +1,34 @@
+{
+  "users": [
+    {
+      "username": "kanfullbuster",
+      "browser": "chrome",
+      "profile_name": "Default",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+    },
+    {
+      "username": "kanfullbuster",
+      "browser": "edge",
+      "profile_name": "Default",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.1823.43 Safari/537.36 Edg/114.0.1823.43"
+    },
+    {
+      "username": "kanfullbuster",
+      "browser": "chrome",
+      "profile_name": "Profile 2",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.199 Safari/537.36"
+    },
+    {
+      "username": "kanfullbuster",
+      "browser": "edge",
+      "profile_name": "Profile 2",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.1901.188 Safari/537.36 Edg/115.0.1901.188"
+    },
+    {
+      "username": "kanfullbuster",
+      "browser": "chrome",
+      "profile_name": "Profile 3",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.5672.93 Safari/537.36"
+    }
+  ]
+}
