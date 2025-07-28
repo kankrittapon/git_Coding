@@ -1,8 +1,8 @@
+import json
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 import booking_scripts.site_pmrocket as pmrocket
 import booking_scripts.site_ithitec as ithitec
-import json
-from pathlib import Path
 
 TRIAL_SITES = {
     "1": ("https://popmart.ithitec.com/", ithitec.booking),
@@ -39,7 +39,6 @@ def choose_branch():
                 print("❌ เลือกหมายเลขไม่ถูกต้อง")
         except ValueError:
             print("❌ กรุณาใส่ตัวเลข")
-
 def choose_day():
     while True:
         try:
@@ -50,9 +49,21 @@ def choose_day():
                 print("❌ เลือกวันไม่ถูกต้อง")
         except ValueError:
             print("❌ กรุณาใส่ตัวเลข")
+def load_time_list():
+    time_path = Path("branch/time.json")
+    if not time_path.exists():
+        print("❌ ไม่พบไฟล์ branch/time.json")
+        return []
+    with open(time_path, "r", encoding="utf-8") as f:
+        times = json.load(f)
+    return times
 
 def choose_time():
-    times = [f"{h:02d}:{m:02d}" for h in range(10, 21) for m in (0, 30)]  # 10:00 ถึง 20:30 ครึ่งชั่วโมง
+    times = load_time_list()
+    if not times:
+        print("❌ รายการเวลาโหลดไม่สำเร็จ")
+        return None
+
     print("\n⏰ เลือกเวลาจากรายการนี้:")
     for i, t in enumerate(times, 1):
         print(f"{i}. {t}")
@@ -91,7 +102,6 @@ def start_trial_mode(username: str):
         print("❌ Invalid browser selection.")
         return
 
-    # รับข้อมูล branch, day, time
     branch = choose_branch()
     if branch is None:
         print("❌ ไม่สามารถโหลดรายชื่อสาขาได้")
@@ -99,6 +109,9 @@ def start_trial_mode(username: str):
 
     day = choose_day()
     time_str = choose_time()
+    if time_str is None:
+        print("❌ เลือกเวลาไม่ถูกต้อง")
+        return
 
     try:
         with sync_playwright() as p:

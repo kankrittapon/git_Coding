@@ -44,32 +44,48 @@ def booking(page: Page, branch: str, selected_day: int, selected_time_str: str):
             page.click(branch_next_button)
             print("Clicked Next button after branch selection")
 
-        # เลือกวัน booking
-        calendar_day_button_prefix = config.get("calendar_day_button_prefix")
-        if calendar_day_button_prefix:
-            day_selector = f"{calendar_day_button_prefix}{selected_day})"
-            page.click(day_selector)
+        # รอปฏิทินโหลด
+        page.wait_for_selector("#calendar-grid")
+
+        # เลือกวัน booking โดยหา button ที่มี text เท่ากับ selected_day
+        day_buttons = page.query_selector_all("#calendar-grid > button.day-cell")
+
+        selected_day_button = None
+        for btn in day_buttons:
+            if btn.inner_text().strip() == str(selected_day):
+                selected_day_button = btn
+                break
+
+        if selected_day_button:
+            selected_day_button.click()
             print(f"Selected day: {selected_day}")
+        else:
+            print(f"❌ ไม่พบวันที่ {selected_day} ในปฏิทิน")
 
         # เลือกเวลา booking (หา button ที่ text ตรงกับ selected_time_str)
-        time_buttons_selector_prefix = config.get("time_buttons_prefix")
-        if time_buttons_selector_prefix:
-            # ดึง list ปุ่มเวลา
-            time_buttons = page.query_selector_all("#root > div > div.step > div > div.button-grid > button")
+        try:
+            page.wait_for_selector("div.button-grid", timeout=5000)
+            time_buttons = page.query_selector_all("div.button-grid > button")
+            print(f"พบปุ่มเวลา {len(time_buttons)} ปุ่ม")
+            for i, btn in enumerate(time_buttons, start=1):
+                print(f"ปุ่มที่ {i}: {btn.inner_text().strip()}")
+
             selected_time_index = None
             for idx, btn in enumerate(time_buttons, start=1):
-                btn_text = btn.inner_text().strip()
-                if btn_text == selected_time_str:
+                if btn.inner_text().strip() == selected_time_str:
                     selected_time_index = idx
                     break
-            
+
             if selected_time_index is None:
                 print(f"❌ ไม่พบเวลาที่เลือก: {selected_time_str}, เลือกเวลาแรกแทน")
                 selected_time_index = 1
-            
-            time_selector = f"{time_buttons_selector_prefix}{selected_time_index})"
+
+            time_selector = f"div.button-grid > button:nth-child({selected_time_index})"
             page.click(time_selector)
             print(f"Selected time: {selected_time_str} (button #{selected_time_index})")
+
+        except Exception as e:
+            print(f"Error selecting time: {e}")
 
         # กด Next หลังเลือกวันและเวลา
         datetime_next_button = config.get("datetime_next_button")

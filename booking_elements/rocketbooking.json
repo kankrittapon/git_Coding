@@ -1,0 +1,32 @@
+{
+  "selectors": {
+    "captcha_form_selector": "#root > div > form",
+    "captcha_begin_button": "#amzn-captcha-verify-button",
+    "captcha_confirm_button": "#amzn-btn-verify-internal",
+    "captcha_instruction_text": "#root > div > form > div:nth-child(3) > div > div > div:nth-child(1)",
+    "captcha_image_grid_buttons": "#root > div > form > div:nth-child(3) > div > div > div:nth-child(2) > canvas > button",
+
+    "profile_button": "a[href='/profile']",
+    "line_connect_button_initial": "body > div > div.sc-396c748-0.YUIJZ > div.ant-flex.css-kghr11.ant-flex-align-center.ant-flex-justify-center.ant-flex-vertical > button",
+    "line_connect_account_button": "body > div > div:nth-child(3) > div.sc-7d3b8656-0.gmBTzU > div.sc-48e8cede-3.kLicsn > button",
+
+    "line_login_email_field": "#app > div > div > div > div.MdBox01 > div > form > fieldset > div:nth-child(2) > input[type=text]",
+    "line_login_password_field": "#app > div > div > div > div.MdBox01 > div > form > fieldset > div:nth-child(3) > input[type=password]",
+    "line_login_button": "#app > div > div > div > div.MdBox01 > div > form > fieldset > div.mdFormGroup01Btn > button",
+    "line_verification_code_text": "#app > div > div > div > div > div > div.MdMN06DigitCode > div.mdMN06CodeBox > p.mdMN06Number",
+
+    "register_button": "button:has-text('Register')",
+    "branch_list": ".branch-list",
+    "branch_buttons": ".branch-list > div",
+    "branch_next_button": "button:has-text('Next')",
+    "calendar_grid": "#calendar-grid",
+    "day_cell_button": "#calendar-grid > button.day-cell",
+    "time_buttons_selector": ".time-slot-buttons",
+    "datetime_next_button": "button:has-text('Next')",
+    "checkbox": "input[type='checkbox']",
+    "confirm_button": "button:has-text('Confirm Booking')",
+    "event_container_selector": "body > div > div.sc-98fa634e-0.fIUykr > div.ant-flex.css-kghr11.ant-flex-align-center.ant-flex-justify-center.ant-flex-vertical > div",
+    "no_event_text_selector": "ไม่มีอีเว้นต์ในขณะนี้",
+    "booking_page_button": "body > div > div.sc-715cd296-0.ipiVos > div > div:nth-child(1) > a > div.sc-715cd296-3.bKZdFH > img"
+  }
+}

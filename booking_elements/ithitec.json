@@ -1,0 +1,9 @@
+{
+  "register_button": "#step-register > div > div > div.event-card > div.register-section > div > button",
+  "branch_list": "#branch-list-container",
+  "branch_buttons": "#branch-list-container",
+  "branch_next_button": "#branch-next-btn",
+  "datetime_next_button": "#datetime-next-btn",
+  "checkbox": "#terms-checkbox",
+  "confirm_button": "#final-book-btn"
+}

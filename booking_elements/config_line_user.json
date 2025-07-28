@@ -1,0 +1,34 @@
+{
+  "line_accounts": [
+    {
+      "username": "kanfullbuster",
+      "profile_name": "Default",
+      "line_email": "another_email@example.com",
+      "line_password": "another_password"
+    },
+    {
+      "username": "kanfullbuster",
+      "profile_name": "Profile 2",
+      "line_email": "another_email@example.com",
+      "line_password": "another_password"
+    },
+    {
+      "username": "kanfullbuster",
+      "profile_name": "Profile 3",
+      "line_email": "another_email@example.com",
+      "line_password": "another_password"
+    },
+    {
+      "username": "kanfullbuster",
+      "profile_name": "Profile 4",
+      "line_email": "another_email@example.com",
+      "line_password": "another_password"
+    },
+    {
+      "username": "kanfullbuster",
+      "profile_name": "Profile 5",
+      "line_email": "another_email@example.com",
+      "line_password": "another_password"
+    }
+  ]
+}
