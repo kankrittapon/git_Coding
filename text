@@ -1,9 +1,33 @@
-pyinstaller main.py --onefile --console `
---add-data "user_config.json;." `
---add-data "booking_elements/config_line_user.json;booking_elements" `
---add-data "branch/config.json;branch" `
---add-data "branch/time.json;branch" `
---add-data "booking_elements/ithitec.json;booking_elements" `
---add-data "booking_elements/pmrocket.json;booking_elements" `
---add-data "booking_elements/rocketbooking.json;booking_elements" `
---add-data "booking_elements/schedule_config.json;booking_elements"
+import requests
+import json
+import gspread
+from google.oauth2.service_account import Credentials
+
+SHEET_NAME = "Users"
+SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
+
+def fetch_credentials_from_api():
+    url = "http://localhost:8000/get-credentials"  # เปลี่ยนเป็น URL จริงตอน deploy
+    headers = {"X-API-Token": "123456SECRET"}
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"โหลด credentials ไม่สำเร็จ: {response.status_code}")
+
+def connect_gsheet():
+    creds_info = fetch_credentials_from_api()
+    scope = ["https://spreadsheets.google.com/feeds",
+             "https://www.googleapis.com/auth/drive"]
+
+    creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SPREADSHEET_ID)
+    return sheet
+
+def load_users():
+    sheet = connect_gsheet()
+    user_sheet = sheet.worksheet(SHEET_NAME)
+    users = user_sheet.col_values(1)[1:]
+    return users
