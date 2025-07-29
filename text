@@ -26,3 +26,4 @@ pyinstaller main.py ^
   --add-data "branch\config.json;branch" ^
   --add-data "branch\time.json;branch"
 
+pyarmor gen main.py gui_app.py live_mode.py trial_mode.py utils.py booking_scripts/site_ithitec.py booking_scripts/site_pmrocket.py booking_scripts/site_rocketbooking.py
