@@ -1,27 +1,31 @@
 import requests
-import json
-import gspread
-from google.oauth2.service_account import Credentials
 
-SHEET_NAME = "Users"
-SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
+API_URL = "https://your-service-name.onrender.com/get-credentials"
+API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="
 
-def fetch_credentials_from_api():
-    url = "http://localhost:8000/get-credentials"  # เปลี่ยนเป็น URL จริงตอน deploy
-    headers = {"X-API-Token": "123456SECRET"}
-
-    response = requests.get(url, headers=headers)
+def download_credentials():
+    headers = {"X-API-Token": API_TOKEN}
+    response = requests.get(API_URL, headers=headers)
     if response.status_code == 200:
-        return response.json()
+        with open("credentials.json", "wb") as f:
+            f.write(response.content)
+        print("Downloaded credentials.json from API")
     else:
-        raise Exception(f"โหลด credentials ไม่สำเร็จ: {response.status_code}")
+        raise Exception(f"Failed to download credentials: {response.status_code} {response.text}")
 
 def connect_gsheet():
-    creds_info = fetch_credentials_from_api()
+    # ก่อนใช้ Google API ต้องดาวน์โหลดไฟล์ก่อน
+    download_credentials()
+
+    import gspread
+    from google.oauth2.service_account import Credentials
+
+    SHEET_NAME = "Users"
+    SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
+
     scope = ["https://spreadsheets.google.com/feeds",
              "https://www.googleapis.com/auth/drive"]
-
-    creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SPREADSHEET_ID)
     return sheet
@@ -29,5 +33,5 @@ def connect_gsheet():
 def load_users():
     sheet = connect_gsheet()
     user_sheet = sheet.worksheet(SHEET_NAME)
-    users = user_sheet.col_values(1)[1:]
+    users = user_sheet.col_values(1)[1:]  # ข้าม header
     return users
