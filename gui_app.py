@@ -9,39 +9,151 @@ import datetime
 import schedule
 import time as time_module
 
-# เพิ่มพาธของโฟลเดอร์แม่เพื่อให้สามารถ import live_mode และ trial_mode ได้
+# เพิ่มพาธของโฟลเดอร์แม่เพื่อให้สามารถ import live_mode, trial_mode และ utils ได้
+# เนื่องจาก gui_app.py จะกลายเป็นไฟล์หลัก
 script_dir = Path(__file__).resolve().parent
 sys.path.append(str(script_dir))
 
 from live_mode import run_live_mode_for_user
-from trial_mode import start_trial_mode, TRIAL_SITES, BROWSERS # นำเข้า start_trial_mode และตัวเลือกจาก trial_mode
+from trial_mode import start_trial_mode, TRIAL_SITES, BROWSERS
+from utils import connect_gsheet # นำเข้า connect_gsheet โดยตรง
 
-# --- พาธไปยัง config ไฟล์ต่างๆ ---
+# --- พาธไปยัง config ไฟล์ต่างๆ (ย้ายมาจาก main.py) ---
 USER_CONFIG_PATH = Path("user_config.json")
 LINE_USER_CONFIG_PATH = Path("booking_elements/config_line_user.json")
 BRANCH_CONFIG_PATH = Path("branch/config.json")
 TIME_CONFIG_PATH = Path("branch/time.json")
 SCHEDULE_CONFIG_PATH = Path("booking_elements/schedule_config.json")
 
-# กำหนดค่า Role เริ่มต้น (ใช้เป็นค่า fallback หากข้อมูลจาก Google Sheet ไม่สมบูรณ์)
+# กำหนดค่า Role เริ่มต้น (ย้ายมาจาก main.py)
 DEFAULT_USER_ROLES = {
     "admin": {
-      "max_profiles": 999,
-      "can_use_scheduler": True
+        "max_profiles": 999,
+        "can_use_scheduler": True
     },
     "vip2": {
-      "max_profiles": 5,
-      "can_use_scheduler": True
+        "max_profiles": 5,
+        "can_use_scheduler": True
     },
     "vip1": {
-      "max_profiles": 3,
-      "can_use_scheduler": True
+        "max_profiles": 3,
+        "can_use_scheduler": True
     },
     "normal": {
-      "max_profiles": 1,
-      "can_use_scheduler": False
+        "max_profiles": 1,
+        "can_use_scheduler": False
     }
 }
+
+# --- ฟังก์ชันช่วยเหลือสำหรับการจัดการไฟล์ config (ย้ายมาจาก main.py) ---
+def ensure_file_exists(path: Path, default_content=None):
+    """
+    เช็คว่าไฟล์ config มีอยู่ไหม ถ้าไม่มีก็สร้างไฟล์เปล่าหรือ default_content ให้
+    """
+    try:
+        if not path.exists():
+            if default_content is None:
+                default_content = {}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(default_content, f, indent=2, ensure_ascii=False)
+            print(f"📝 สร้างไฟล์ config ใหม่ที่ {path}")
+    except Exception as e:
+        print(f"❌ เกิดข้อผิดพลาดขณะสร้างไฟล์ config {path}: {e}")
+
+def load_json_config(path):
+    """Helper to load JSON config safely (ย้ายมาจาก main.py)."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Config file not found: {path}")
+        return {}
+    except json.JSONDecodeError:
+        print(f"❌ Invalid JSON in config file: {path}")
+        return {}
+    except Exception as e:
+        print(f"❌ Could not load config file {path}: {e}")
+        return {}
+
+# --- ฟังก์ชันสำหรับโหลดข้อมูลผู้ใช้และสิทธิ์จาก Google Sheet (ย้ายมาจาก main.py) ---
+def load_user_credentials_from_gsheet():
+    """
+    Loads user credentials and roles from the Google Sheet.
+    Returns a list of user credential dictionaries.
+    """
+    try:
+        print("กำลังโหลดข้อมูลผู้ใช้และสิทธิ์จาก Google Sheet...")
+        sheet = connect_gsheet()  # จะโหลด credentials.json ผ่าน API ใน utils.py
+        user_sheet = sheet.worksheet("Users")  # ชื่อชีตที่เก็บข้อมูลผู้ใช้
+        all_records = user_sheet.get_all_records()  # ดึงข้อมูลทั้งหมดในรูปแบบ dictionary list
+
+        user_credentials = []
+        for record in all_records:
+            username = record.get("Username")
+            password = record.get("Password")
+            role = record.get("Role")
+
+            if username and password and role:
+                max_profiles_from_sheet = record.get("Max Profiles")
+                can_use_scheduler_from_sheet = record.get("Can Use Scheduler")
+
+                effective_max_profiles = DEFAULT_USER_ROLES.get(role, {}).get("max_profiles", 1)
+                if max_profiles_from_sheet is not None:
+                    try:
+                        effective_max_profiles = int(max_profiles_from_sheet)
+                    except ValueError:
+                        print(f"⚠️ Warning: 'Max Profiles' for {username} is not a valid number. Using default for role '{role}'.")
+
+                effective_can_use_scheduler = DEFAULT_USER_ROLES.get(role, {}).get("can_use_scheduler", False)
+                if can_use_scheduler_from_sheet is not None:
+                    effective_can_use_scheduler = str(can_use_scheduler_from_sheet).strip().upper() == "TRUE"
+
+                user_credentials.append({
+                    "username": username,
+                    "password": password,
+                    "role": role,
+                    "max_profiles": effective_max_profiles,
+                    "can_use_scheduler": effective_can_use_scheduler
+                })
+            else:
+                print(f"⚠️ Warning: ข้อมูลผู้ใช้ไม่สมบูรณ์ใน Google Sheet (Username: {username}, Role: {role}). ข้ามรายการนี้.")
+
+        print(f"✅ โหลดข้อมูลผู้ใช้ {len(user_credentials)} รายการจาก Google Sheet สำเร็จแล้ว.")
+        return user_credentials
+
+    except Exception as e:
+        print(f"❌ เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้จาก Google Sheet: {e}")
+        return []
+
+def authenticate_user(username, password, gsheet_users_data):
+    """
+    Authenticates a user against data loaded from Google Sheet.
+    Returns (user_data_dict) on success, or None on failure.
+    The user_data_dict will contain 'username', 'role', 'max_profiles', 'can_use_scheduler'.
+    """
+    for user_cred in gsheet_users_data:
+        if user_cred.get("username") == username and user_cred.get("password") == password:
+            return user_cred  # Return the full user data dict
+    return None
+
+def get_available_profiles(username, all_user_profiles_from_config):
+    """Filters profiles from user_config.json for a given username."""
+    user_profiles = [u for u in all_user_profiles_from_config.get("users", []) if u["username"] == username]
+    return user_profiles
+
+def load_line_credentials(username, profile_name, all_line_accounts):
+    """
+    Loads LINE email and password from loaded line accounts data.
+    """
+    for account in all_line_accounts:
+        if account["username"] == username and account["profile_name"] == profile_name:
+            print(f"✅ โหลดข้อมูล LINE Login สำหรับ '{username}' ({profile_name}) สำเร็จแล้ว.")
+            return account.get("line_email"), account.get("line_password")
+
+    print(f"⚠️ ไม่พบข้อมูล LINE Login สำหรับ '{username}' ({profile_name}).")
+    return None, None
+
 
 class BookingApp:
     def __init__(self, root, all_configs, gsheet_users_data):
@@ -49,12 +161,12 @@ class BookingApp:
         self.root.title("Popmartth Rocket Booking Bot UI (แยก Main)")
         self.root.geometry("800x800") # ขยายหน้าต่างให้ใหญ่ขึ้นเพื่อรองรับ Config Tab
 
-        # Load configs (รับมาจาก main.py)
+        # Load configs (รับมาจาก main.py หรือในกรณีนี้คือโหลดเองใน run_gui_app)
         self.users_data = all_configs['user_profiles'].get("users", []) # Profiles from user_config.json
         self.line_accounts = all_configs['line_accounts'] # LINE accounts from config_line_user.json
         self.branches = all_configs['branches'] # Branches from branch/config.json
         self.times = all_configs['times'] # Times from branch/time.json
-        self.gsheet_users_data = gsheet_users_data # User credentials from Google Sheet (from main.py)
+        self.gsheet_users_data = gsheet_users_data # User credentials from Google Sheet (จากฟังก์ชัน load_user_credentials_from_gsheet)
         
         # Schedule config (โหลดเองเพราะ GUI เป็นผู้จัดการการเพิ่ม/แก้ไข)
         self.scheduled_bookings = self._load_json_config_for_gui(SCHEDULE_CONFIG_PATH).get("scheduled_bookings", [])
@@ -425,7 +537,7 @@ class BookingApp:
             messagebox.showwarning("Warning", "กรุณาใส่ Username และ Password.")
             return
 
-        user_auth_data = self._authenticate_user_from_gsheet(username, password)
+        user_auth_data = authenticate_user(username, password, self.gsheet_users_data)
 
         if user_auth_data:
             self.logged_in_username = user_auth_data['username']
@@ -941,8 +1053,7 @@ class BookingApp:
                             current_user_role_at_run_time = logged_in_user_details.get('role', 'normal') if logged_in_user_details else 'normal'
 
                             job_profile_str_for_check = f"{data['username']} - {data['browser']} - {data['profile_name']}"
-                            all_user_profiles_for_check = [f"{u['username']} - {u['browser']} - {u['profile_name']}" 
-                                                            for u in self.users_data if u['username'] == data['username']]
+                            all_user_profiles_for_check = [u for u in self.users_data if u['username'] == data['username']]
                             
                             profile_index_at_run_time = -1
                             try:
@@ -1187,3 +1298,174 @@ class BookingApp:
         # ตรวจสอบสิทธิ์การแก้ไขบัญชี LINE (อาจจะจำกัดเฉพาะ Admin)
         if self.logged_in_username is None or self.user_role != 'admin':
             messagebox.showerror("ข้อผิดพลาด", "คุณไม่มีสิทธิ์แก้ไขบัญชี LINE.")
+            return
+
+        selected_item = self.line_accounts_tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Warning", "กรุณาเลือกบัญชี LINE ที่ต้องการแก้ไข.")
+            return
+        
+        account_index = int(selected_item)
+        account_data = self.line_accounts[account_index]
+        self._open_line_account_editor_window(account_data, account_index)
+
+    def _edit_line_account_gui(self, event): # For double-click
+        self._edit_selected_line_account_gui()
+
+    def _delete_selected_line_account_gui(self):
+        # ตรวจสอบสิทธิ์การลบบัญชี LINE (อาจจะจำกัดเฉพาะ Admin)
+        if self.logged_in_username is None or self.user_role != 'admin':
+            messagebox.showerror("ข้อผิดพลาด", "คุณไม่มีสิทธิ์ลบบัญชี LINE.")
+            return
+
+        selected_item = self.line_accounts_tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Warning", "กรุณาเลือกบัญชี LINE ที่ต้องการลบ.")
+            return
+        
+        account_index = int(selected_item)
+        account_email = self.line_accounts[account_index].get('line_email', 'Unknown')
+
+        if messagebox.askyesno("ยืนยันการลบ", f"คุณแน่ใจหรือไม่ที่ต้องการลบบัญชี LINE '{account_email}'?"):
+            del self.line_accounts[account_index]
+            self._save_json_config_for_gui(LINE_USER_CONFIG_PATH, {"line_accounts": self.line_accounts})
+            self._update_line_accounts_display()
+            self.log_message(f"🗑️ ลบบัญชี LINE '{account_email}' แล้ว.")
+
+    def _open_line_account_editor_window(self, account_data=None, account_index=None):
+        editor_win = tk.Toplevel(self.root)
+        editor_win.title("เพิ่ม/แก้ไขบัญชี LINE")
+        editor_win.geometry("400x350")
+        editor_win.transient(self.root)
+        editor_win.grab_set()
+
+        username_var = tk.StringVar(editor_win)
+        profile_name_var = tk.StringVar(editor_win)
+        line_email_var = tk.StringVar(editor_win)
+        line_password_var = tk.StringVar(editor_win)
+
+        form_frame = ttk.Frame(editor_win, padding=10)
+        form_frame.pack(fill="both", expand=True)
+
+        labels_data = [
+            ("Username:", username_var, "entry"),
+            ("Profile Name:", profile_name_var, "entry"),
+            ("LINE Email:", line_email_var, "entry"),
+            ("LINE Password:", line_password_var, "entry_password") # Use _password type for show="*"
+        ]
+
+        row = 0
+        for label_text, var, widget_type in labels_data:
+            ttk.Label(form_frame, text=label_text).grid(row=row, column=0, sticky="w", pady=2)
+            if widget_type == "entry":
+                ttk.Entry(form_frame, textvariable=var, width=30).grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+            elif widget_type == "entry_password":
+                ttk.Entry(form_frame, textvariable=var, show="*", width=30).grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+            row += 1
+
+        if account_data:
+            username_var.set(account_data.get('username', ''))
+            profile_name_var.set(account_data.get('profile_name', ''))
+            line_email_var.set(account_data.get('line_email', ''))
+            line_password_var.set(account_data.get('line_password', '')) # Password will be shown in plain text for editing. Consider masking for security.
+        else:
+            # Default values for new account
+            username_var.set(self.logged_in_username if self.logged_in_username else "")
+
+        button_frame = ttk.Frame(editor_win, padding=10)
+        button_frame.pack(fill="x", pady=5)
+        ttk.Button(button_frame, text="บันทึก", command=lambda: self._save_line_account_from_editor(editor_win, username_var.get(), profile_name_var.get(), line_email_var.get(), line_password_var.get(), account_index)).pack(side="left", padx=5)
+        ttk.Button(button_frame, text="ยกเลิก", command=editor_win.destroy).pack(side="right", padx=5)
+
+    def _save_line_account_from_editor(self, editor_win, username, profile_name, line_email, line_password, account_index):
+        try:
+            if not all([username, profile_name, line_email, line_password]):
+                messagebox.showwarning("ข้อมูลไม่ครบ", "กรุณากรอกข้อมูลให้ครบทุกช่อง.")
+                return
+
+            new_account_data = {
+                "username": username,
+                "profile_name": profile_name,
+                "line_email": line_email,
+                "line_password": line_password
+            }
+
+            # Check for duplicates (username + profile_name should be unique)
+            is_duplicate = False
+            for idx, existing_account in enumerate(self.line_accounts):
+                if (existing_account['username'] == username and 
+                    existing_account['profile_name'] == profile_name and
+                    idx != account_index): # Exclude itself if editing
+                    is_duplicate = True
+                    break
+            
+            if is_duplicate:
+                messagebox.showerror("ข้อผิดพลาด", "บัญชี LINE สำหรับโปรไฟล์นี้มีอยู่แล้ว.")
+                return
+
+            if account_index is not None:
+                self.line_accounts[account_index] = new_account_data
+                self.log_message(f"✅ แก้ไขบัญชี LINE '{line_email}' แล้ว.")
+            else:
+                self.line_accounts.append(new_account_data)
+                self.log_message(f"✅ เพิ่มบัญชี LINE '{line_email}' ใหม่แล้ว.")
+            
+            self._save_json_config_for_gui(LINE_USER_CONFIG_PATH, {"line_accounts": self.line_accounts})
+            self._update_line_accounts_display()
+            editor_win.destroy()
+
+        except Exception as e:
+            messagebox.showerror("ข้อผิดพลาด", f"ไม่สามารถบันทึกบัญชี LINE ได้: {e}")
+
+class TextRedirector:
+    def __init__(self, widget, tag="stdout"):
+        self.widget = widget
+        self.tag = tag
+        self.stdout = sys.__stdout__
+
+    def write(self, s):
+        self.widget.config(state='normal')
+        self.widget.insert(tk.END, s, (self.tag,))
+        self.widget.see(tk.END)
+        self.widget.config(state='disabled')
+        self.stdout.write(s)
+
+    def flush(self):
+        self.stdout.flush()
+
+# --- ฟังก์ชัน main ที่ปรับแก้ใหม่สำหรับ gui_app.py (ย้ายมาจาก main.py) ---
+def run_gui_app(all_configs, gsheet_users_data):
+    """
+    Function to start the Tkinter GUI.
+    Receives pre-loaded configs and GSheet user data.
+    This now acts as the primary entry point when main.py is removed.
+    """
+    root = tk.Tk()
+    app = BookingApp(root, all_configs, gsheet_users_data)
+    root.mainloop()
+
+# --- บล็อกหลักสำหรับการรันโปรแกรม (ย้ายมาจาก main.py) ---
+if __name__ == "__main__":
+    # ตรวจสอบและสร้างไฟล์ config ถ้ายังไม่มี
+    ensure_file_exists(USER_CONFIG_PATH, {"users": []})
+    ensure_file_exists(LINE_USER_CONFIG_PATH, {"line_accounts": []})
+    ensure_file_exists(BRANCH_CONFIG_PATH, [])
+    ensure_file_exists(TIME_CONFIG_PATH, [])
+    ensure_file_exists(SCHEDULE_CONFIG_PATH, {"scheduled_bookings": []}) # เพิ่ม schedule_config.json
+
+    # Load all necessary configs at the start
+    all_configs = {
+        'user_profiles': load_json_config(USER_CONFIG_PATH),
+        'line_accounts': load_json_config(LINE_USER_CONFIG_PATH).get("line_accounts", []),
+        'branches': load_json_config(BRANCH_CONFIG_PATH),
+        'times': load_json_config(TIME_CONFIG_PATH),
+    }
+    gsheet_users_data = load_user_credentials_from_gsheet()  # Load user credentials from GSheet
+
+    if not gsheet_users_data:
+        print("❌ ไม่สามารถโหลดข้อมูลผู้ใช้จาก Google Sheet ได้. โปรแกรมไม่สามารถทำงานได้.")
+        # messagebox.showerror("Error", "ไม่สามารถโหลดข้อมูลผู้ใช้จาก Google Sheet ได้. โปรแกรมไม่สามารถทำงานได้.")
+        sys.exit(1) # ออกจากโปรแกรมหากโหลดข้อมูลไม่ได้
+
+    print("Starting GUI mode...")
+    run_gui_app(all_configs, gsheet_users_data)
