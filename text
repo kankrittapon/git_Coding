@@ -6,3 +6,23 @@ LINE_USER_CONFIG_PATH = Path(__file__).resolve().parent / "booking_elements/conf
 # ส่วนที่ไม่ควรแก้ (อยู่ใน .exe)
 BRANCH_CONFIG_PATH = BASE_PATH / "branch/config.json"
 TIME_CONFIG_PATH = BASE_PATH / "branch/time.json"
+
+pip install pyarmor
+pyarmor gen main.py gui_app.py live_mode.py trial_mode.py utils.py booking_scripts/*.py
+
+pyinstaller main.py ^
+  --onefile ^
+  --noconsole ^
+  --add-data "credentials.json;." ^
+  --add-data "gui_app.py;." ^
+  --add-data "live_mode.py;." ^
+  --add-data "trial_mode.py;." ^
+  --add-data "utils.py;." ^
+  --add-data "booking_scripts;booking_scripts" ^
+  --add-data "booking_elements\ithitec.json;booking_elements" ^
+  --add-data "booking_elements\pmrocket.json;booking_elements" ^
+  --add-data "booking_elements\rocketbooking.json;booking_elements" ^
+  --add-data "booking_elements\schedule_config.json;booking_elements" ^
+  --add-data "branch\config.json;branch" ^
+  --add-data "branch\time.json;branch"
+
