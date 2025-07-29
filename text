@@ -1,23 +1,27 @@
-import json
 import requests
 from google.oauth2.service_account import Credentials
 import gspread
+import os
 
 API_URL = "https://backend-secure-cred-api.onrender.com/get-credentials"
-API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="
+API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="  # ต้องตรงกับ token ที่ตั้งไว้ใน backend
 
-def connect_gsheet():
+def download_credentials_json():
     headers = {"X-API-Token": API_TOKEN}
     response = requests.get(API_URL, headers=headers)
-    response.raise_for_status()
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"โหลด credentials ไม่สำเร็จ: {response.status_code} {response.text}")
 
-    creds_json = response.json()  # ดึงเป็น dict จาก JSON response
+def connect_gsheet():
+    # ดาวน์โหลด JSON credential จาก API
+    creds_json = download_credentials_json()
 
-    creds = Credentials.from_service_account_info(creds_json, scopes=[
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ])
+    scope = ["https://spreadsheets.google.com/feeds",
+             "https://www.googleapis.com/auth/drive"]
 
+    creds = Credentials.from_service_account_info(creds_json, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key("1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk")
     return sheet
