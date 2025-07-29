@@ -34,3 +34,11 @@ if __name__ == "__main__":
     except Exception:
         with open("error_log.txt", "w", encoding="utf-8") as f:
             f.write(traceback.format_exc())
+
+from gui_app import run_gui_app  # ✅ ถูกต้อง
+run_gui_app(all_configs, gsheet_users_data)
+
+if mode_arg == "--gui":
+    print("Starting GUI mode...")
+    from gui_app import run_gui_app
+    run_gui_app(all_configs, gsheet_users_data)
