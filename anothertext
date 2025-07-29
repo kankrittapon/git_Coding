@@ -37,6 +37,21 @@ DEFAULT_USER_ROLES = {
     }
 }
 
+def ensure_file_exists(path: Path, default_content=None):
+    """
+    เช็คว่าไฟล์ config มีอยู่ไหม ถ้าไม่มีก็สร้างไฟล์เปล่าหรือ default_content ให้
+    """
+    try:
+        if not path.exists():
+            if default_content is None:
+                default_content = {}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(default_content, f, indent=2, ensure_ascii=False)
+            print(f"📝 สร้างไฟล์ config ใหม่ที่ {path}")
+    except Exception as e:
+        print(f"❌ เกิดข้อผิดพลาดขณะสร้างไฟล์ config {path}: {e}")
+
 # --- ฟังก์ชันสำหรับโหลดข้อมูลผู้ใช้และสิทธิ์จาก Google Sheet ---
 def load_user_credentials_from_gsheet():
     """
@@ -224,6 +239,12 @@ def run_cli_mode(all_configs, gsheet_users_data):
         print("❌ Username หรือ Password ไม่ถูกต้อง.")
 
 def start():
+    # ตรวจสอบและสร้างไฟล์ config ถ้ายังไม่มี
+    ensure_file_exists(USER_CONFIG_PATH, {"users": []})
+    ensure_file_exists(LINE_USER_CONFIG_PATH, {"line_accounts": []})
+    ensure_file_exists(BRANCH_CONFIG_PATH, [])
+    ensure_file_exists(TIME_CONFIG_PATH, [])
+
     # Load all necessary configs at the start
     all_configs = {
         'user_profiles': load_json_config(USER_CONFIG_PATH),
