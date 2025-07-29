@@ -6,32 +6,33 @@ datas = [
     ('user_config.json', '.'),
     ('booking_elements', 'booking_elements'), # รวมทั้งโฟลเดอร์ booking_elements
     ('branch', 'branch'), # รวมทั้งโฟลเดอร์ branch
-    # ไม่ต้องมี 'credentials.json' แล้ว เพราะโหลดจาก API
 ]
 
 # กำหนด hidden imports ที่ PyInstaller อาจหาไม่เจออัตโนมัติ
 hiddenimports = [
     'tkinter', 'tkinter.ttk', 'gspread', 'google.oauth2.service_account',
-    'schedule', 'requests', # เพิ่ม 'requests' เนื่องจาก utils.py ใช้
-    'gui_app', # <--- เพิ่มบรรทัดนี้เข้ามา
+    'schedule', 'requests',
+    'live_mode', # gui_app.py จะ import live_mode โดยตรง
+    'trial_mode', # gui_app.py จะ import trial_mode โดยตรง
+    'utils',     # gui_app.py จะ import utils โดยตรง
 ]
 
 # รวบรวม Playwright dependencies ทั้งหมด
 tmp_ret = collect_all('playwright')
 datas += tmp_ret[0]
-binaries = tmp_ret[1] # Playwright binaries จะถูกเพิ่มเข้ามา
+binaries = tmp_ret[1]
 hiddenimports += tmp_ret[2]
 
 a = Analysis(
-    ['main.py'], # ไฟล์หลักของโปรเจกต์
+    ['gui_app.py'], # <--- **แก้ไขตรงนี้** จาก 'main.py' เป็น 'gui_app.py'
     pathex=[],
-    binaries=binaries, # ใช้ binaries ที่ collect มาจาก Playwright
-    datas=datas, # ใช้ datas ที่รวมไฟล์ config และ Playwright data
+    binaries=binaries,
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PyQt5', 'PySide6'], # ไม่รวมโมดูลที่ไม่จำเป็น
+    excludes=['PyQt5', 'PySide6'],
     noarchive=False,
     optimize=0,
 )
