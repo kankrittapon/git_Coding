@@ -1,9 +1,1 @@
-pyinstaller --onefile --noconsole main.py \
-  --add-data "user_config.json;." \
-  --add-data "booking_elements/config_line_user.json;booking_elements" \
-  --add-data "booking_elements/ithitec.json;booking_elements" \
-  --add-data "booking_elements/pmrocket.json;booking_elements" \
-  --add-data "booking_elements/rocketbooking.json;booking_elements" \
-  --add-data "booking_elements/schedule_config.json;booking_elements" \
-  --add-data "branch/config.json;branch" \
-  --add-data "branch/time.json;branch"
+pyinstaller --onefile --noconsole main.py --add-data "user_config.json;." --add-data "booking_elements/config_line_user.json;booking_elements" --add-data "booking_elements/ithitec.json;booking_elements" --add-data "booking_elements/pmrocket.json;booking_elements" --add-data "booking_elements/rocketbooking.json;booking_elements" --add-data "booking_elements/schedule_config.json;booking_elements" --add-data "branch/config.json;branch" --add-data "branch/time.json;branch"
