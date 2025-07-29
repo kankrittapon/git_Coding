@@ -1,31 +1,33 @@
+import os
 import requests
+import gspread
+from google.oauth2.service_account import Credentials
 
-API_URL = "https://your-service-name.onrender.com/get-credentials"
-API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="
+API_URL = "https://backend-secure-cred-api.onrender.com/get-credentials"
+API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="  # ใช้ token เดียวกับที่เรียก curl
+LOCAL_CREDENTIALS_PATH = "credentials.json"
+
+SHEET_NAME = "Users"  # ชื่อชีตที่เก็บข้อมูล user
+SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
 
 def download_credentials():
     headers = {"X-API-Token": API_TOKEN}
     response = requests.get(API_URL, headers=headers)
     if response.status_code == 200:
-        with open("credentials.json", "wb") as f:
+        with open(LOCAL_CREDENTIALS_PATH, "wb") as f:
             f.write(response.content)
-        print("Downloaded credentials.json from API")
+        print("ดาวน์โหลด credentials.json สำเร็จ")
     else:
-        raise Exception(f"Failed to download credentials: {response.status_code} {response.text}")
+        raise Exception(f"โหลด credentials ไม่สำเร็จ: {response.status_code} {response.text}")
 
 def connect_gsheet():
-    # ก่อนใช้ Google API ต้องดาวน์โหลดไฟล์ก่อน
-    download_credentials()
-
-    import gspread
-    from google.oauth2.service_account import Credentials
-
-    SHEET_NAME = "Users"
-    SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
+    # โหลดไฟล์ credentials.json ก่อนทุกครั้ง (หรือจะโหลดแค่ครั้งแรกก็ได้)
+    if not os.path.exists(LOCAL_CREDENTIALS_PATH):
+        download_credentials()
 
     scope = ["https://spreadsheets.google.com/feeds",
              "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+    creds = Credentials.from_service_account_file(LOCAL_CREDENTIALS_PATH, scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open_by_key(SPREADSHEET_ID)
     return sheet
