@@ -6,15 +6,19 @@ datas = [
     ('user_config.json', '.'),
     ('booking_elements', 'booking_elements'), # รวมทั้งโฟลเดอร์ booking_elements
     ('branch', 'branch'), # รวมทั้งโฟลเดอร์ branch
+    # ไม่ต้องมี 'credentials.json' แล้ว เพราะโหลดจาก API
 ]
 
 # กำหนด hidden imports ที่ PyInstaller อาจหาไม่เจออัตโนมัติ
 hiddenimports = [
     'tkinter', 'tkinter.ttk', 'gspread', 'google.oauth2.service_account',
     'schedule', 'requests',
-    'live_mode', # gui_app.py จะ import live_mode โดยตรง
-    'trial_mode', # gui_app.py จะ import trial_mode โดยตรง
-    'utils',     # gui_app.py จะ import utils โดยตรง
+    'live_mode',
+    'trial_mode',
+    'utils',
+    'booking_scripts.site_rocketbooking', # <--- เพิ่มบรรทัดนี้เข้ามา
+    'booking_scripts.site_pmrocket',      # <--- เพิ่มบรรทัดนี้เข้ามา
+    'booking_scripts.site_ithitec',       # <--- เพิ่มบรรทัดนี้เข้ามา
 ]
 
 # รวบรวม Playwright dependencies ทั้งหมด
@@ -24,7 +28,7 @@ binaries = tmp_ret[1]
 hiddenimports += tmp_ret[2]
 
 a = Analysis(
-    ['gui_app.py'], # <--- **แก้ไขตรงนี้** จาก 'main.py' เป็น 'gui_app.py'
+    ['gui_app.py'], # ไฟล์หลักของโปรเจกต์
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -48,7 +52,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False, # ตั้งค่าเป็น False สำหรับ GUI application
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
