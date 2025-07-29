@@ -9,11 +9,12 @@ import datetime
 import schedule
 import time as time_module
 
-# เพิ่มพาธของโฟลเดอร์แม่เพื่อให้สามารถ import live_mode ได้
+# เพิ่มพาธของโฟลเดอร์แม่เพื่อให้สามารถ import live_mode และ trial_mode ได้
 script_dir = Path(__file__).resolve().parent
 sys.path.append(str(script_dir))
 
 from live_mode import run_live_mode_for_user
+from trial_mode import start_trial_mode, TRIAL_SITES, BROWSERS # นำเข้า start_trial_mode และตัวเลือกจาก trial_mode
 
 # --- พาธไปยัง config ไฟล์ต่างๆ ---
 USER_CONFIG_PATH = Path("user_config.json")
@@ -92,7 +93,7 @@ class BookingApp:
                     empty_data = {"line_accounts": []}
 
                 with open(path, "w", encoding="utf-8") as f:
-                    json.dump(empty_data, f, indent=2)
+                    json.dump(empty_data, f, indent=2, ensure_ascii=False) # เพิ่ม ensure_ascii=False
                 self.log_message(f"✅ สร้างไฟล์ config เปล่าที่ {path} แล้ว.")
                 return empty_data
             with open(path, "r", encoding="utf-8") as f:
@@ -108,7 +109,7 @@ class BookingApp:
         """Helper to save JSON config safely."""
         try:
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=2, ensure_ascii=False) # เพิ่ม ensure_ascii=False
             self.log_message(f"✅ Config saved to {path}")
         except Exception as e:
             self.log_message(f"❌ Failed to save config to {path}: {e}")
@@ -155,6 +156,16 @@ class BookingApp:
         manual_frame = ttk.Frame(self.manual_tab, padding=10)
         manual_frame.pack(fill="both", expand=True)
 
+        # --- Booking Mode Selection ---
+        self.manual_widgets['booking_mode_frame'] = ttk.LabelFrame(manual_frame, text="เลือกโหมดการจอง", padding=10)
+        self.manual_widgets['booking_mode_var'] = tk.StringVar(self.root)
+        self.manual_widgets['booking_mode_combobox'] = ttk.Combobox(self.manual_widgets['booking_mode_frame'],
+                                                                    textvariable=self.manual_widgets['booking_mode_var'],
+                                                                    values=["Live Mode", "Trial Mode"], state="readonly")
+        self.manual_widgets['booking_mode_combobox'].pack(fill="x", padx=5, pady=5)
+        self.manual_widgets['booking_mode_var'].set("Live Mode") # Default mode
+        self.manual_widgets['booking_mode_var'].trace_add('write', self._on_booking_mode_change) # Trace changes
+
         self.manual_widgets['user_profile_frame'] = ttk.LabelFrame(manual_frame, text="เลือกโปรไฟล์ผู้ใช้", padding=10)
         self.manual_widgets['user_profile_var'] = tk.StringVar(self.root)
         self.manual_widgets['user_profile_combobox'] = ttk.Combobox(self.manual_widgets['user_profile_frame'], 
@@ -183,6 +194,28 @@ class BookingApp:
                                                             values=self.times, state="readonly")
         self.manual_widgets['time_combobox'].pack(fill="x", padx=5, pady=5)
         self.manual_widgets['time_var'].set(self.times[0] if self.times else "")
+
+        # --- Trial Mode Specific Widgets ---
+        self.manual_widgets['trial_mode_options_frame'] = ttk.LabelFrame(manual_frame, text="ตัวเลือกโหมดทดสอบ", padding=10)
+        
+        # Get trial site options from imported TRIAL_SITES
+        trial_site_options = [url for key, (url, _) in TRIAL_SITES.items()]
+        self.manual_widgets['trial_site_var'] = tk.StringVar(self.root)
+        self.manual_widgets['trial_site_combobox'] = ttk.Combobox(self.manual_widgets['trial_mode_options_frame'],
+                                                                    textvariable=self.manual_widgets['trial_site_var'],
+                                                                    values=trial_site_options, state="readonly")
+        self.manual_widgets['trial_site_combobox'].pack(fill="x", padx=5, pady=5)
+        if trial_site_options: self.manual_widgets['trial_site_var'].set(trial_site_options[0])
+
+        # Get trial browser options from imported BROWSERS
+        trial_browser_options = list(BROWSERS.values()) # 'chrome', 'edge'
+        self.manual_widgets['trial_browser_var'] = tk.StringVar(self.root)
+        self.manual_widgets['trial_browser_combobox'] = ttk.Combobox(self.manual_widgets['trial_mode_options_frame'],
+                                                                    textvariable=self.manual_widgets['trial_browser_var'],
+                                                                    values=trial_browser_options, state="readonly")
+        self.manual_widgets['trial_browser_combobox'].pack(fill="x", padx=5, pady=5)
+        if trial_browser_options: self.manual_widgets['trial_browser_var'].set(trial_browser_options[0])
+
 
         self.manual_widgets['start_button'] = ttk.Button(manual_frame, text="🚀 เริ่มการจอง", command=self._start_manual_booking_thread, state="disabled")
         self.manual_widgets['start_button'].pack(pady=10)
@@ -270,15 +303,48 @@ class BookingApp:
         self.log_text.pack(padx=10, pady=5, fill="both", expand=True)
 
         self._set_ui_state_after_login()
+        self._on_booking_mode_change() # Call once to set initial state of trial widgets
     
+    def _on_booking_mode_change(self, *args):
+        """Handle change in booking mode selection."""
+        selected_mode = self.manual_widgets['booking_mode_var'].get()
+        if selected_mode == "Trial Mode":
+            self.manual_widgets['trial_mode_options_frame'].pack(padx=5, pady=5, fill="x")
+            # Hide user profile selection for Trial Mode as it's not directly used by start_trial_mode
+            self.manual_widgets['user_profile_frame'].pack_forget() 
+            self.manual_widgets['day_frame'].pack_forget() # Hide Day selection for Trial (uses current day)
+            self.manual_widgets['time_frame'].pack_forget() # Hide Time selection for Trial (uses current time)
+        else: # Live Mode
+            self.manual_widgets['trial_mode_options_frame'].pack_forget()
+            self.manual_widgets['user_profile_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['day_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['time_frame'].pack(padx=5, pady=5, fill="x")
+
+
     def _set_manual_booking_controls_state(self, state):
         """Controls visibility and state of manual booking widgets."""
-        for key in ['user_profile_frame', 'branch_frame', 'day_frame', 'time_frame']:
-            if key in self.manual_widgets:
-                if state == "normal":
-                    self.manual_widgets[key].pack(padx=5, pady=5, fill="x")
-                else:
-                    self.manual_widgets[key].pack_forget()
+        # Always pack booking mode selector
+        self.manual_widgets['booking_mode_frame'].pack(padx=5, pady=5, fill="x") 
+
+        # Control other frames based on selected mode
+        selected_mode = self.manual_widgets['booking_mode_var'].get()
+
+        if selected_mode == "Trial Mode":
+            # Only Trial specific frames and shared ones visible
+            self.manual_widgets['user_profile_frame'].pack_forget()
+            self.manual_widgets['branch_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['day_frame'].pack_forget() # Trial uses current day
+            self.manual_widgets['time_frame'].pack_forget() # Trial uses current time
+            self.manual_widgets['trial_mode_options_frame'].pack(padx=5, pady=5, fill="x")
+        else: # Live Mode
+            # All frames for Live mode visible
+            self.manual_widgets['user_profile_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['branch_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['day_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['time_frame'].pack(padx=5, pady=5, fill="x")
+            self.manual_widgets['trial_mode_options_frame'].pack_forget()
+
+        # Set state for start button based on overall state
         if 'start_button' in self.manual_widgets:
             self.manual_widgets['start_button'].config(state=state)
 
@@ -321,6 +387,8 @@ class BookingApp:
                 self.notebook.tab(self.config_tab, state="disabled")
                 self.log_message("⚠️ คุณไม่มีสิทธิ์ใช้งานแท็บ 'จัดการ Config'.")
 
+            # Ensure correct visibility of booking mode specific controls after login
+            self._on_booking_mode_change() # Re-evaluate packing based on selected mode
         else: # Not logged in
             self._set_manual_booking_controls_state("disabled")
             self.notebook.tab(self.schedule_tab, state="disabled")
@@ -388,54 +456,111 @@ class BookingApp:
 
 
     def _start_manual_booking_thread(self):
-        selected_profile_str = self.manual_widgets['user_profile_var'].get()
-        if not selected_profile_str:
-            messagebox.showwarning("Warning", "กรุณาเลือกโปรไฟล์ก่อนเริ่มการจอง.")
+        selected_mode = self.manual_widgets['booking_mode_var'].get()
+        selected_branch = self.manual_widgets['branch_var'].get()
+        selected_day_str = self.manual_widgets['day_var'].get()
+        selected_time_str = self.manual_widgets['time_var'].get()
+
+        if not selected_branch or not selected_day_str or not selected_time_str:
+            messagebox.showwarning("Warning", "กรุณาเลือก สาขา, วัน, และเวลา ให้ครบถ้วนก่อนเริ่มการจอง.")
             return
 
-        selected_profile_index = self.manual_widgets['user_profile_combobox'].current()
-        if selected_profile_index == -1:
-             messagebox.showwarning("Warning", "กรุณาเลือกโปรไฟล์ที่ถูกต้อง.")
-             return
-
-        parts = selected_profile_str.split(' - ')
-        selected_username_in_profile = parts[0]
-        selected_browser_in_profile = parts[1]
-        selected_profile_name_in_profile = parts[2]
-
-        all_user_profiles_full_objects = [u for u in self.users_data if u['username'] == selected_username_in_profile]
-        
-        actual_profile_idx_for_check = -1
-        for i, p_obj in enumerate(all_user_profiles_full_objects):
-            if p_obj['browser'] == selected_browser_in_profile and p_obj['profile_name'] == selected_profile_name_in_profile:
-                actual_profile_idx_for_check = i
-                break
-        
-        if self.logged_in_username != selected_username_in_profile and self.user_role != 'admin':
-            messagebox.showerror("Error", "คุณสามารถจองได้เฉพาะโปรไฟล์ของบัญชีที่คุณล็อกอินอยู่เท่านั้น.")
-            return
-
-        if self.user_role != 'admin' and actual_profile_idx_for_check >= self.max_allowed_profiles:
-            messagebox.showerror("Error", f"โปรไฟล์ที่เลือกเกินจำนวนที่อนุญาต ({self.max_allowed_profiles} โปรไฟล์สำหรับ Role '{self.user_role}').")
+        # Common checks
+        if not self.logged_in_username:
+            messagebox.showwarning("Warning", "กรุณาล็อกอินก่อนเริ่มการจอง.")
             return
 
         self.manual_widgets['start_button'].config(state="disabled")
-        self.log_message("เริ่มต้นกระบวนการจอง (ด้วยตัวเอง)...")
-        
-        booking_thread = threading.Thread(target=self._run_booking_process, args=(
-            selected_profile_str,
-            self.manual_widgets['branch_var'].get(),
-            self.manual_widgets['day_var'].get(),
-            self.manual_widgets['time_var'].get()
-        ))
-        booking_thread.start()
+        self.log_message(f"เริ่มต้นกระบวนการจอง ({selected_mode})...")
 
-    def _run_booking_process(self, selected_profile_str, selected_branch, selected_day_str, selected_time_str):
-        try:
-            if not selected_profile_str or not selected_branch or not selected_day_str or not selected_time_str:
-                self.log_message("❌ กรุณาเลือกข้อมูลให้ครบถ้วนก่อนเริ่มการจอง.")
+        if selected_mode == "Live Mode":
+            selected_profile_str = self.manual_widgets['user_profile_var'].get()
+            if not selected_profile_str:
+                messagebox.showwarning("Warning", "กรุณาเลือกโปรไฟล์ก่อนเริ่มการจอง.")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
                 return
 
+            parts = selected_profile_str.split(' - ')
+            selected_username_in_profile = parts[0]
+            selected_browser_in_profile = parts[1]
+            selected_profile_name_in_profile = parts[2]
+
+            all_user_profiles_full_objects = [u for u in self.users_data if u['username'] == selected_username_in_profile]
+            
+            actual_profile_idx_for_check = -1
+            for i, p_obj in enumerate(all_user_profiles_full_objects):
+                if p_obj['browser'] == selected_browser_in_profile and p_obj['profile_name'] == selected_profile_name_in_profile:
+                    actual_profile_idx_for_check = i
+                    break
+            
+            if self.logged_in_username != selected_username_in_profile and self.user_role != 'admin':
+                messagebox.showerror("Error", "คุณสามารถจองได้เฉพาะโปรไฟล์ของบัญชีที่คุณล็อกอินอยู่เท่านั้น.")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+                return
+
+            if self.user_role != 'admin' and actual_profile_idx_for_check >= self.max_allowed_profiles:
+                messagebox.showerror("Error", f"โปรไฟล์ที่เลือกเกินจำนวนที่อนุญาต ({self.max_allowed_profiles} โปรไฟล์สำหรับ Role '{self.user_role}').")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+                return
+
+            booking_thread = threading.Thread(target=self._run_booking_process_live, args=(
+                selected_profile_str,
+                selected_branch,
+                selected_day_str,
+                selected_time_str
+            ))
+            booking_thread.start()
+
+        elif selected_mode == "Trial Mode":
+            selected_trial_site_url = self.manual_widgets['trial_site_var'].get()
+            selected_trial_browser = self.manual_widgets['trial_browser_var'].get()
+
+            if not selected_trial_site_url or not selected_trial_browser:
+                messagebox.showwarning("Warning", "กรุณาเลือกเว็บไซต์ทดสอบและเบราว์เซอร์ทดสอบให้ครบถ้วน.")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+                return
+
+            # Map URL to site_choice key (e.g., '1' or '2')
+            trial_site_key = None
+            for key, (url, _) in TRIAL_SITES.items():
+                if url == selected_trial_site_url:
+                    trial_site_key = key
+                    break
+            
+            if trial_site_key is None:
+                messagebox.showerror("Error", "ไม่พบเว็บไซต์ทดสอบที่เลือก.")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+                return
+
+            # Map browser name to browser_choice key (e.g., '1' or '2')
+            trial_browser_key = None
+            for key, name in BROWSERS.items():
+                if name == selected_trial_browser:
+                    trial_browser_key = key
+                    break
+
+            if trial_browser_key is None:
+                messagebox.showerror("Error", "ไม่พบเบราว์เซอร์ทดสอบที่เลือก.")
+                self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+                return
+            
+            # For trial mode, we can use the logged-in username or a dummy
+            # For simplicity, we'll pass the logged-in username
+            trial_username = self.logged_in_username 
+            
+            booking_thread = threading.Thread(target=self._run_booking_process_trial, args=(
+                trial_username,
+                trial_site_key,
+                trial_browser_key,
+                selected_branch,
+                int(selected_day_str), # day
+                selected_time_str # time_str
+            ))
+            booking_thread.start()
+
+
+    def _run_booking_process_live(self, selected_profile_str, selected_branch, selected_day_str, selected_time_str):
+        try:
             parts = selected_profile_str.split(' - ')
             username = parts[0]
             browser = parts[1]
@@ -459,6 +584,20 @@ class BookingApp:
             self.log_message(f"❌ เกิดข้อผิดพลาดในกระบวนการจอง: {e}")
         finally:
             self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+
+    def _run_booking_process_trial(self, username, site_key, browser_key, branch, day, time_str):
+        try:
+            self.log_message(f"Selected Trial: User='{username}', Site='{TRIAL_SITES[site_key][0]}', Browser='{BROWSERS[browser_key]}', Branch='{branch}', Day={day}, Time='{time_str}'")
+            
+            start_trial_mode(username, site_key, browser_key, branch, day, time_str)
+            
+            self.log_message(f"✅ กระบวนการทดสอบ '{username}' (Site: {TRIAL_SITES[site_key][0]}, Browser: {BROWSERS[browser_key]}) เสร็จสิ้น.")
+
+        except Exception as e:
+            self.log_message(f"❌ เกิดข้อผิดพลาดในกระบวนการทดสอบ: {e}")
+        finally:
+            self.root.after(100, lambda: self.manual_widgets['start_button'].config(state="normal"))
+
 
     def _load_line_credentials_for_ui(self, username, profile_name):
         try:
@@ -866,7 +1005,7 @@ class BookingApp:
         selected_day_str = str(job_data['day'])
         selected_time_str = job_data['time_str']
 
-        booking_thread = threading.Thread(target=self._run_booking_process, args=(
+        booking_thread = threading.Thread(target=self._run_booking_process_live, args=( # ต้องใช้ _run_booking_process_live เสมอสำหรับ Scheduled Booking
             selected_profile_str, selected_branch, selected_day_str, selected_time_str
         ))
         booking_thread.start()
@@ -1048,146 +1187,3 @@ class BookingApp:
         # ตรวจสอบสิทธิ์การแก้ไขบัญชี LINE (อาจจะจำกัดเฉพาะ Admin)
         if self.logged_in_username is None or self.user_role != 'admin':
             messagebox.showerror("ข้อผิดพลาด", "คุณไม่มีสิทธิ์แก้ไขบัญชี LINE.")
-            return
-
-        selected_item = self.line_accounts_tree.focus()
-        if not selected_item:
-            messagebox.showwarning("Warning", "กรุณาเลือกบัญชี LINE ที่ต้องการแก้ไข.")
-            return
-        
-        account_index = int(selected_item)
-        account_data = self.line_accounts[account_index]
-        self._open_line_account_editor_window(account_data, account_index)
-
-    def _edit_line_account_gui(self, event): # For double-click
-        self._edit_selected_line_account_gui()
-
-    def _delete_selected_line_account_gui(self):
-        # ตรวจสอบสิทธิ์การลบบัญชี LINE (อาจจะจำกัดเฉพาะ Admin)
-        if self.logged_in_username is None or self.user_role != 'admin':
-            messagebox.showerror("ข้อผิดพลาด", "คุณไม่มีสิทธิ์ลบบัญชี LINE.")
-            return
-
-        selected_item = self.line_accounts_tree.focus()
-        if not selected_item:
-            messagebox.showwarning("Warning", "กรุณาเลือกบัญชี LINE ที่ต้องการลบ.")
-            return
-        
-        account_index = int(selected_item)
-        account_email = self.line_accounts[account_index].get('line_email', 'Unknown')
-
-        if messagebox.askyesno("ยืนยันการลบ", f"คุณแน่ใจหรือไม่ที่ต้องการลบบัญชี LINE '{account_email}'?"):
-            del self.line_accounts[account_index]
-            self._save_json_config_for_gui(LINE_USER_CONFIG_PATH, {"line_accounts": self.line_accounts})
-            self._update_line_accounts_display()
-            self.log_message(f"🗑️ ลบบัญชี LINE '{account_email}' แล้ว.")
-
-    def _open_line_account_editor_window(self, account_data=None, account_index=None):
-        editor_win = tk.Toplevel(self.root)
-        editor_win.title("เพิ่ม/แก้ไขบัญชี LINE")
-        editor_win.geometry("400x350")
-        editor_win.transient(self.root)
-        editor_win.grab_set()
-
-        username_var = tk.StringVar(editor_win)
-        profile_name_var = tk.StringVar(editor_win)
-        line_email_var = tk.StringVar(editor_win)
-        line_password_var = tk.StringVar(editor_win)
-
-        form_frame = ttk.Frame(editor_win, padding=10)
-        form_frame.pack(fill="both", expand=True)
-
-        labels_data = [
-            ("Username:", username_var, "entry"),
-            ("Profile Name:", profile_name_var, "entry"),
-            ("LINE Email:", line_email_var, "entry"),
-            ("LINE Password:", line_password_var, "entry_password") # Use _password type for show="*"
-        ]
-
-        row = 0
-        for label_text, var, widget_type in labels_data:
-            ttk.Label(form_frame, text=label_text).grid(row=row, column=0, sticky="w", pady=2)
-            if widget_type == "entry":
-                ttk.Entry(form_frame, textvariable=var, width=30).grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-            elif widget_type == "entry_password":
-                ttk.Entry(form_frame, textvariable=var, show="*", width=30).grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-            row += 1
-
-        if account_data:
-            username_var.set(account_data.get('username', ''))
-            profile_name_var.set(account_data.get('profile_name', ''))
-            line_email_var.set(account_data.get('line_email', ''))
-            line_password_var.set(account_data.get('line_password', '')) # Password will be shown in plain text for editing. Consider masking for security.
-        else:
-            # Default values for new account
-            username_var.set(self.logged_in_username if self.logged_in_username else "")
-
-        button_frame = ttk.Frame(editor_win, padding=10)
-        button_frame.pack(fill="x", pady=5)
-        ttk.Button(button_frame, text="บันทึก", command=lambda: self._save_line_account_from_editor(editor_win, username_var.get(), profile_name_var.get(), line_email_var.get(), line_password_var.get(), account_index)).pack(side="left", padx=5)
-        ttk.Button(button_frame, text="ยกเลิก", command=editor_win.destroy).pack(side="right", padx=5)
-
-    def _save_line_account_from_editor(self, editor_win, username, profile_name, line_email, line_password, account_index):
-        try:
-            if not all([username, profile_name, line_email, line_password]):
-                messagebox.showwarning("ข้อมูลไม่ครบ", "กรุณากรอกข้อมูลให้ครบทุกช่อง.")
-                return
-
-            new_account_data = {
-                "username": username,
-                "profile_name": profile_name,
-                "line_email": line_email,
-                "line_password": line_password
-            }
-
-            # Check for duplicates (username + profile_name should be unique)
-            is_duplicate = False
-            for idx, existing_account in enumerate(self.line_accounts):
-                if (existing_account['username'] == username and 
-                    existing_account['profile_name'] == profile_name and
-                    idx != account_index): # Exclude itself if editing
-                    is_duplicate = True
-                    break
-            
-            if is_duplicate:
-                messagebox.showerror("ข้อผิดพลาด", "บัญชี LINE สำหรับโปรไฟล์นี้มีอยู่แล้ว.")
-                return
-
-            if account_index is not None:
-                self.line_accounts[account_index] = new_account_data
-                self.log_message(f"✅ แก้ไขบัญชี LINE '{line_email}' แล้ว.")
-            else:
-                self.line_accounts.append(new_account_data)
-                self.log_message(f"✅ เพิ่มบัญชี LINE '{line_email}' ใหม่แล้ว.")
-            
-            self._save_json_config_for_gui(LINE_USER_CONFIG_PATH, {"line_accounts": self.line_accounts})
-            self._update_line_accounts_display()
-            editor_win.destroy()
-
-        except Exception as e:
-            messagebox.showerror("ข้อผิดพลาด", f"ไม่สามารถบันทึกบัญชี LINE ได้: {e}")
-
-class TextRedirector:
-    def __init__(self, widget, tag="stdout"):
-        self.widget = widget
-        self.tag = tag
-        self.stdout = sys.__stdout__
-
-    def write(self, s):
-        self.widget.config(state='normal')
-        self.widget.insert(tk.END, s, (self.tag,))
-        self.widget.see(tk.END)
-        self.widget.config(state='disabled')
-        self.stdout.write(s)
-
-    def flush(self):
-        self.stdout.flush()
-
-def run_gui_app(all_configs, gsheet_users_data):
-    """
-    Function to start the Tkinter GUI.
-    Receives pre-loaded configs and GSheet user data from main.py.
-    """
-    root = tk.Tk()
-    app = BookingApp(root, all_configs, gsheet_users_data)
-    root.mainloop()
