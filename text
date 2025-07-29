@@ -1,52 +1,23 @@
-import os
+import json
 import requests
-import gspread
 from google.oauth2.service_account import Credentials
+import gspread
 
-# URL และ Token สำหรับโหลด credentials.json จาก API ของคุณ
 API_URL = "https://backend-secure-cred-api.onrender.com/get-credentials"
-API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="  # ต้องตรงกับฝั่ง server
-
-# ชื่อไฟล์ credentials.json ในเครื่อง
-CREDENTIALS_PATH = "credentials.json"
-
-def download_credentials():
-    headers = {"X-API-Token": API_TOKEN}
-    print("กำลังดาวน์โหลด credentials.json จาก API ด้วย header:", headers)
-    response = requests.get(API_URL, headers=headers)
-    print("สถานะตอบกลับ:", response.status_code)
-    if response.status_code == 200:
-        with open(CREDENTIALS_PATH, "wb") as f:
-            f.write(response.content)
-        print("ดาวน์โหลด credentials.json สำเร็จ")
-    else:
-        print("ข้อความตอบกลับจาก API:", response.text)
-        raise Exception(f"โหลด credentials ไม่สำเร็จ: {response.status_code} {response.text}")
+API_TOKEN = "a2htZW5odWFrdXltYWV5ZWQ="
 
 def connect_gsheet():
-    # โหลดไฟล์ credentials.json ถ้าไม่มีในเครื่อง
-    if not os.path.exists(CREDENTIALS_PATH):
-        download_credentials()
+    headers = {"X-API-Token": API_TOKEN}
+    response = requests.get(API_URL, headers=headers)
+    response.raise_for_status()
 
-    # กำหนด scope สำหรับ Google API
-    scope = [
+    creds_json = response.json()  # ดึงเป็น dict จาก JSON response
+
+    creds = Credentials.from_service_account_info(creds_json, scopes=[
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
-    ]
+    ])
 
-    # โหลด credential จากไฟล์ที่ดาวน์โหลดมา
-    creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=scope)
-
-    # สร้าง client gspread
     client = gspread.authorize(creds)
-
-    # เปิด spreadsheet ด้วย spreadsheet ID
-    SPREADSHEET_ID = "1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk"
-    sheet = client.open_by_key(SPREADSHEET_ID)
+    sheet = client.open_by_key("1rQnV_-30tmb8oYj7g9q6-YdyuWZZ2c8sZ2xH7pqszVk")
     return sheet
-
-def load_users():
-    sheet = connect_gsheet()
-    user_sheet = sheet.worksheet("Users")  # ชื่อชีตที่เก็บข้อมูล user
-    users = user_sheet.col_values(1)[1:]  # ข้าม header
-    return users
