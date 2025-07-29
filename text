@@ -1,4 +1,4 @@
-pyinstaller main.py --onefile --noconsole `
+pyinstaller main.py --onefile --console `
 --add-data "user_config.json;." `
 --add-data "booking_elements/config_line_user.json;booking_elements" `
 --add-data "branch/config.json;branch" `
