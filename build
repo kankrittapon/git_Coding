@@ -13,6 +13,7 @@ datas = [
 hiddenimports = [
     'tkinter', 'tkinter.ttk', 'gspread', 'google.oauth2.service_account',
     'schedule', 'requests', # เพิ่ม 'requests' เนื่องจาก utils.py ใช้
+    'gui_app', # <--- เพิ่มบรรทัดนี้เข้ามา
 ]
 
 # รวบรวม Playwright dependencies ทั้งหมด
