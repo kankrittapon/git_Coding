@@ -10,7 +10,7 @@ TIME_CONFIG_PATH = BASE_PATH / "branch/time.json"
 pip install pyarmor
 pyarmor gen main.py gui_app.py live_mode.py trial_mode.py utils.py booking_scripts/*.py
 
-pyinstaller main.py --onefile --noconsole `
+pyinstaller main.py --onefile `
   --add-data "gui_app.py;." `
   --add-data "live_mode.py;." `
   --add-data "trial_mode.py;." `
@@ -24,4 +24,13 @@ pyinstaller main.py --onefile --noconsole `
   --add-data "branch\time.json;branch"
 
 
-pyarmor gen main.py gui_app.py live_mode.py trial_mode.py utils.py booking_scripts/site_ithitec.py booking_scripts/site_pmrocket.py booking_scripts/site_rocketbooking.py
+import traceback
+
+if __name__ == "__main__":
+    try:
+        # โค้ดเดิมที่คุณเรียกเริ่มโปรแกรม
+        from gui_app import start_gui
+        start_gui()  # หรืออะไรก็ตามที่ใช้เป็นจุดเริ่ม
+    except Exception:
+        with open("error_log.txt", "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
