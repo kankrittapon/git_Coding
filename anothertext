@@ -1,0 +1,254 @@
+import json
+from pathlib import Path
+import sys
+import os
+
+# เพิ่มพาธของโฟลเดอร์ปัจจุบันไปยัง sys.path เพื่อให้สามารถ import โมดูลอื่น ๆ ได้
+script_dir = Path(__file__).resolve().parent
+sys.path.append(str(script_dir))
+
+from live_mode import run_live_mode_for_user
+from trial_mode import start_trial_mode as run_trial_mode  # หากยังคงใช้ trial mode
+from utils import connect_gsheet  # สำหรับการโหลดข้อมูลผู้ใช้จาก Google Sheet
+
+# --- พาธไปยัง config ไฟล์ต่างๆ ---
+USER_CONFIG_PATH = Path("user_config.json")
+LINE_USER_CONFIG_PATH = Path("booking_elements/config_line_user.json")
+BRANCH_CONFIG_PATH = Path("branch/config.json")
+TIME_CONFIG_PATH = Path("branch/time.json")
+
+# กำหนดค่า Role เริ่มต้น (ใช้เป็นค่า fallback หากข้อมูลจาก Google Sheet ไม่สมบูรณ์)
+DEFAULT_USER_ROLES = {
+    "admin": {
+        "max_profiles": 999,
+        "can_use_scheduler": True
+    },
+    "vip2": {
+        "max_profiles": 5,
+        "can_use_scheduler": True
+    },
+    "vip1": {
+        "max_profiles": 3,
+        "can_use_scheduler": True
+    },
+    "normal": {
+        "max_profiles": 1,
+        "can_use_scheduler": False
+    }
+}
+
+# --- ฟังก์ชันสำหรับโหลดข้อมูลผู้ใช้และสิทธิ์จาก Google Sheet ---
+def load_user_credentials_from_gsheet():
+    """
+    Loads user credentials and roles from the Google Sheet.
+    Returns a list of user credential dictionaries.
+    """
+    try:
+        print("กำลังโหลดข้อมูลผู้ใช้และสิทธิ์จาก Google Sheet...")
+        sheet = connect_gsheet()  # จะโหลด credentials.json ผ่าน API ใน utils.py
+        user_sheet = sheet.worksheet("Users")  # ชื่อชีตที่เก็บข้อมูลผู้ใช้
+        all_records = user_sheet.get_all_records()  # ดึงข้อมูลทั้งหมดในรูปแบบ dictionary list
+
+        user_credentials = []
+        for record in all_records:
+            username = record.get("Username")
+            password = record.get("Password")
+            role = record.get("Role")
+
+            if username and password and role:
+                max_profiles_from_sheet = record.get("Max Profiles")
+                can_use_scheduler_from_sheet = record.get("Can Use Scheduler")
+
+                effective_max_profiles = DEFAULT_USER_ROLES.get(role, {}).get("max_profiles", 1)
+                if max_profiles_from_sheet is not None:
+                    try:
+                        effective_max_profiles = int(max_profiles_from_sheet)
+                    except ValueError:
+                        print(f"⚠️ Warning: 'Max Profiles' for {username} is not a valid number. Using default for role '{role}'.")
+
+                effective_can_use_scheduler = DEFAULT_USER_ROLES.get(role, {}).get("can_use_scheduler", False)
+                if can_use_scheduler_from_sheet is not None:
+                    effective_can_use_scheduler = str(can_use_scheduler_from_sheet).strip().upper() == "TRUE"
+
+                user_credentials.append({
+                    "username": username,
+                    "password": password,
+                    "role": role,
+                    "max_profiles": effective_max_profiles,
+                    "can_use_scheduler": effective_can_use_scheduler
+                })
+            else:
+                print(f"⚠️ Warning: ข้อมูลผู้ใช้ไม่สมบูรณ์ใน Google Sheet (Username: {username}, Role: {role}). ข้ามรายการนี้.")
+
+        print(f"✅ โหลดข้อมูลผู้ใช้ {len(user_credentials)} รายการจาก Google Sheet สำเร็จแล้ว.")
+        return user_credentials
+
+    except Exception as e:
+        print(f"❌ เกิดข้อผิดพลาดในการโหลดข้อมูลผู้ใช้จาก Google Sheet: {e}")
+        return []
+
+def authenticate_user(username, password, gsheet_users_data):
+    """
+    Authenticates a user against data loaded from Google Sheet.
+    Returns (user_data_dict) on success, or None on failure.
+    The user_data_dict will contain 'username', 'role', 'max_profiles', 'can_use_scheduler'.
+    """
+    for user_cred in gsheet_users_data:
+        if user_cred.get("username") == username and user_cred.get("password") == password:
+            return user_cred  # Return the full user data dict
+    return None
+
+def load_json_config(path):
+    """Helper to load JSON config safely."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Config file not found: {path}")
+        return {}
+    except json.JSONDecodeError:
+        print(f"❌ Invalid JSON in config file: {path}")
+        return {}
+    except Exception as e:
+        print(f"❌ Could not load config file {path}: {e}")
+        return {}
+
+def get_available_profiles(username, all_user_profiles_from_config):
+    """Filters profiles from user_config.json for a given username."""
+    user_profiles = [u for u in all_user_profiles_from_config.get("users", []) if u["username"] == username]
+    return user_profiles
+
+def load_line_credentials(username, profile_name, all_line_accounts):
+    """
+    Loads LINE email and password from loaded line accounts data.
+    """
+    for account in all_line_accounts:
+        if account["username"] == username and account["profile_name"] == profile_name:
+            print(f"✅ โหลดข้อมูล LINE Login สำหรับ '{username}' ({profile_name}) สำเร็จแล้ว.")
+            return account.get("line_email"), account.get("line_password")
+
+    print(f"⚠️ ไม่พบข้อมูล LINE Login สำหรับ '{username}' ({profile_name}).")
+    return None, None
+
+def run_cli_mode(all_configs, gsheet_users_data):
+    """
+    Runs the command-line interface mode.
+    """
+    print("\n--- โหมด CLI ---")
+    username = input("Username: ").strip()
+    password = input("Password: ").strip()
+
+    user_auth_data = authenticate_user(username, password, gsheet_users_data)
+
+    if user_auth_data:
+        print(f"✅ Welcome, {username}! (Role: {user_auth_data['role']})")
+
+        # Filter profiles based on logged in user's username and max_profiles
+        available_profiles_for_user = get_available_profiles(username, all_configs['user_profiles'])
+        if user_auth_data['role'] != 'admin' and len(available_profiles_for_user) > user_auth_data['max_profiles']:
+            available_profiles_for_user = available_profiles_for_user[:user_auth_data['max_profiles']]
+            print(f"ℹ️ คุณสามารถเข้าถึงได้สูงสุด {user_auth_data['max_profiles']} โปรไฟล์.")
+
+        if not available_profiles_for_user:
+            print("❌ ไม่พบโปรไฟล์ที่ใช้งานได้สำหรับ Username นี้ใน user_config.json")
+            return
+
+        print("\n📋 โปรไฟล์ที่มีให้เลือก:")
+        for i, u in enumerate(available_profiles_for_user):
+            print(f"{i+1}. {u['browser']} - {u['profile_name']}")
+
+        try:
+            choice = int(input("เลือกหมายเลขโปรไฟล์ที่ต้องการใช้: "))
+            selected_profile_obj = available_profiles_for_user[choice - 1]
+            browser = selected_profile_obj['browser']
+            profile_name = selected_profile_obj['profile_name']
+
+            line_email, line_password = load_line_credentials(username, profile_name, all_configs['line_accounts'])
+
+            # --- CLI specific prompts for booking details ---
+            branches = all_configs['branches']
+            if not branches:
+                print("❌ ไม่สามารถโหลดรายชื่อสาขาได้")
+                return
+            print("\n🏢 เลือกสาขา (Branch):")
+            for i, b in enumerate(branches):
+                print(f"{i+1}. {b}")
+            while True:
+                try:
+                    branch_choice = int(input("กรุณาเลือกหมายเลขสาขา: "))
+                    if 1 <= branch_choice <= len(branches):
+                        branch = branches[branch_choice - 1]
+                        break
+                    else:
+                        print("❌ เลือกหมายเลขไม่ถูกต้อง")
+                except ValueError:
+                    print("❌ กรุณาใส่ตัวเลข")
+
+            while True:
+                try:
+                    day = int(input("เลือกวัน (1-31): "))
+                    if 1 <= day <= 31:
+                        break
+                    else:
+                        print("❌ เลือกวันไม่ถูกต้อง")
+                except ValueError:
+                    print("❌ กรุณาใส่ตัวเลข")
+
+            times = all_configs['times']
+            if not times:
+                print("❌ รายการเวลาโหลดไม่สำเร็จ")
+                return None
+            print("\n⏰ เลือกเวลาจากรายการนี้:")
+            for i, t in enumerate(times, 1):
+                print(f"{i}. {t}")
+            while True:
+                try:
+                    time_choice = int(input("กรุณาเลือกหมายเลขเวลา: "))
+                    if 1 <= time_choice <= len(times):
+                        time_index = time_choice - 1  # Convert to 0-based index
+                        break
+                    else:
+                        print("❌ เลือกหมายเลขไม่ถูกต้อง")
+                except ValueError:
+                    print("❌ กรุณาใส่ตัวเลข")
+
+            # Call run_live_mode_for_user to start the booking process
+            run_live_mode_for_user(username, browser, profile_name, branch, day, time_index, line_email, line_password)
+
+        except (IndexError, ValueError):
+            print("❌ เลือกไม่ถูกต้อง")
+        except Exception as e:
+            print(f"เกิดข้อผิดพลาด: {e}")
+
+    else:
+        print("❌ Username หรือ Password ไม่ถูกต้อง.")
+
+def start():
+    # Load all necessary configs at the start
+    all_configs = {
+        'user_profiles': load_json_config(USER_CONFIG_PATH),
+        'line_accounts': load_json_config(LINE_USER_CONFIG_PATH).get("line_accounts", []),
+        'branches': load_json_config(BRANCH_CONFIG_PATH),
+        'times': load_json_config(TIME_CONFIG_PATH),
+    }
+    gsheet_users_data = load_user_credentials_from_gsheet()  # Load user credentials from GSheet
+
+    if not gsheet_users_data:
+        print("❌ ไม่สามารถโหลดข้อมูลผู้ใช้จาก Google Sheet ได้. โปรแกรมไม่สามารถทำงานได้.")
+        return
+
+    # Check if a specific mode is requested via command line arguments
+    # python main.py --gui or python main.py --cli
+    mode_arg = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    if mode_arg == "--gui":
+        print("Starting GUI mode...")
+        # Import gui_app here to avoid circular imports if gui_app imports main
+        from gui_app import run_gui_app  # Assuming run_gui_app is a function in gui_app.py that starts the Tkinter loop
+        run_gui_app(all_configs, gsheet_users_data)
+    else:  # Default to CLI mode if no --gui arg or other unrecognized arg
+        run_cli_mode(all_configs, gsheet_users_data)
+
+
+if __name__ == "__main__":
+    start()
