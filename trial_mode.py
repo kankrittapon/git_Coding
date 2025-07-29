@@ -23,32 +23,6 @@ def load_branch_list():
         branches = json.load(f)
     return branches
 
-def choose_branch():
-    branches = load_branch_list()
-    if not branches:
-        return None
-    print("\n🏢 เลือกสาขา (Branch):")
-    for i, b in enumerate(branches):
-        print(f"{i+1}. {b}")
-    while True:
-        try:
-            choice = int(input("กรุณาเลือกหมายเลขสาขา: "))
-            if 1 <= choice <= len(branches):
-                return branches[choice - 1]
-            else:
-                print("❌ เลือกหมายเลขไม่ถูกต้อง")
-        except ValueError:
-            print("❌ กรุณาใส่ตัวเลข")
-def choose_day():
-    while True:
-        try:
-            day = int(input("เลือกวัน (1-31): "))
-            if 1 <= day <= 31:
-                return day
-            else:
-                print("❌ เลือกวันไม่ถูกต้อง")
-        except ValueError:
-            print("❌ กรุณาใส่ตัวเลข")
 def load_time_list():
     time_path = Path("branch/time.json")
     if not time_path.exists():
@@ -58,57 +32,30 @@ def load_time_list():
         times = json.load(f)
     return times
 
-def choose_time():
-    times = load_time_list()
-    if not times:
-        print("❌ รายการเวลาโหลดไม่สำเร็จ")
-        return None
-
-    print("\n⏰ เลือกเวลาจากรายการนี้:")
-    for i, t in enumerate(times, 1):
-        print(f"{i}. {t}")
-    while True:
-        try:
-            choice = int(input("กรุณาเลือกหมายเลขเวลา: "))
-            if 1 <= choice <= len(times):
-                return times[choice - 1]  # คืนค่าเวลาที่เลือก (string)
-            else:
-                print("❌ เลือกหมายเลขไม่ถูกต้อง")
-        except ValueError:
-            print("❌ กรุณาใส่ตัวเลข")
-
-def start_trial_mode(username: str):
+# ปรับแก้ฟังก์ชัน start_trial_mode ให้รับค่าเป็นพารามิเตอร์
+def start_trial_mode(username: str, site_choice: str, browser_choice: str, branch: str, day: int, time_str: str):
     print(f"\n🧪 Trial Mode for {username}")
 
-    print("\n🔸 Select website:")
-    for key, (url, _) in TRIAL_SITES.items():
-        print(f"{key}. {url}")
-    site_choice = input("Enter site number: ").strip()
     site = TRIAL_SITES.get(site_choice)
-
     if not site:
-        print("❌ Invalid site selection.")
+        print(f"❌ Invalid site selection: {site_choice}.")
         return
 
     site_url, booking_func = site
 
-    print("\n🔹 Select browser:")
-    print("1. Chrome")
-    print("2. Edge")
-    browser_choice = input("Enter browser number: ").strip()
     browser_name = BROWSERS.get(browser_choice)
-
     if not browser_name:
-        print("❌ Invalid browser selection.")
+        print(f"❌ Invalid browser selection: {browser_choice}.")
         return
 
-    branch = choose_branch()
     if branch is None:
         print("❌ ไม่สามารถโหลดรายชื่อสาขาได้")
         return
 
-    day = choose_day()
-    time_str = choose_time()
+    if day is None or not (1 <= day <= 31):
+        print(f"❌ เลือกวันไม่ถูกต้อง: {day}")
+        return
+
     if time_str is None:
         print("❌ เลือกเวลาไม่ถูกต้อง")
         return
@@ -121,6 +68,9 @@ def start_trial_mode(username: str):
                 browser = browser_type.launch(headless=False, channel="chrome")
             elif browser_name == "edge":
                 browser = browser_type.launch(headless=False, channel="msedge")
+            else:
+                print(f"❌ ไม่รองรับเบราว์เซอร์: {browser_name}")
+                return
 
             page = browser.new_page()
             page.goto(site_url)
@@ -134,3 +84,52 @@ def start_trial_mode(username: str):
 
     except Exception as e:
         print(f"❌ Error: {e}")
+
+# ลบฟังก์ชัน choose_branch, choose_day, choose_time ออกไป (หรือคอมเมนต์ไว้)
+# เพื่อป้องกันการเรียกใช้ input() ในโหมด GUI
+# def choose_branch():
+#     branches = load_branch_list()
+#     if not branches:
+#         return None
+#     print("\n🏢 เลือกสาขา (Branch):")
+#     for i, b in enumerate(branches):
+#         print(f"{i+1}. {b}")
+#     while True:
+#         try:
+#             choice = int(input("กรุณาเลือกหมายเลขสาขา: "))
+#             if 1 <= choice <= len(branches):
+#                 return branches[choice - 1]
+#             else:
+#                 print("❌ เลือกหมายเลขไม่ถูกต้อง")
+#         except ValueError:
+#             print("❌ กรุณาใส่ตัวเลข")
+
+# def choose_day():
+#     while True:
+#         try:
+#             day = int(input("เลือกวัน (1-31): "))
+#             if 1 <= day <= 31:
+#                 return day
+#             else:
+#                 print("❌ เลือกวันไม่ถูกต้อง")
+#         except ValueError:
+#             print("❌ กรุณาใส่ตัวเลข")
+
+# def choose_time():
+#     times = load_time_list()
+#     if not times:
+#         print("❌ รายการเวลาโหลดไม่สำเร็จ")
+#         return None
+
+#     print("\n⏰ เลือกเวลาจากรายการนี้:")
+#     for i, t in enumerate(times, 1):
+#         print(f"{i}. {t}")
+#     while True:
+#         try:
+#             choice = int(input("กรุณาเลือกหมายเลขเวลา: "))
+#             if 1 <= choice <= len(times):
+#                 return times[choice - 1]  # คืนค่าเวลาที่เลือก (string)
+#             else:
+#                 print("❌ เลือกหมายเลขไม่ถูกต้อง")
+#         except ValueError:
+#             print("❌ กรุณาใส่ตัวเลข")
