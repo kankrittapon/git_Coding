@@ -1,14 +1,64 @@
-@echo off
-REM Build script for PyInstaller with data files included
+# -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
 
-pyinstaller --onefile --noconsole main.py ^
- --add-data "user_config.json;." ^
- --add-data "booking_elements/config_line_user.json;booking_elements" ^
- --add-data "booking_elements/ithitec.json;booking_elements" ^
- --add-data "booking_elements/pmrocket.json;booking_elements" ^
- --add-data "booking_elements/rocketbooking.json;booking_elements" ^
- --add-data "booking_elements/schedule_config.json;booking_elements" ^
- --add-data "branch/config.json;branch" ^
- --add-data "branch/time.json;branch"
+# กำหนดไฟล์ข้อมูลที่ต้องรวม
+datas = [
+    ('user_config.json', '.'),
+    ('booking_elements', 'booking_elements'), # รวมทั้งโฟลเดอร์ booking_elements
+    ('branch', 'branch'), # รวมทั้งโฟลเดอร์ branch
+    # ไม่ต้องมี 'credentials.json' แล้ว เพราะโหลดจาก API
+]
 
-pause
+# กำหนด hidden imports ที่ PyInstaller อาจหาไม่เจออัตโนมัติ
+hiddenimports = [
+    'tkinter', 'tkinter.ttk', 'gspread', 'google.oauth2.service_account',
+    'schedule', 'requests', # เพิ่ม 'requests' เนื่องจาก utils.py ใช้
+]
+
+# รวบรวม Playwright dependencies ทั้งหมด
+tmp_ret = collect_all('playwright')
+datas += tmp_ret[0]
+binaries = tmp_ret[1] # Playwright binaries จะถูกเพิ่มเข้ามา
+hiddenimports += tmp_ret[2]
+
+a = Analysis(
+    ['main.py'], # ไฟล์หลักของโปรเจกต์
+    pathex=[],
+    binaries=binaries, # ใช้ binaries ที่ collect มาจาก Playwright
+    datas=datas, # ใช้ datas ที่รวมไฟล์ config และ Playwright data
+    hiddenimports=hiddenimports,
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=['PyQt5', 'PySide6'], # ไม่รวมโมดูลที่ไม่จำเป็น
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='PopmartthBookingBot', # ชื่อไฟล์ executable
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    console=False, # ตั้งค่าเป็น False สำหรับ GUI application
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='PopmartthBookingBot',
+)
