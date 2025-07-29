@@ -265,10 +265,10 @@ def start():
     if mode_arg == "--gui":
         print("Starting GUI mode...")
         # Import gui_app here to avoid circular imports if gui_app imports main
-        from gui_app import run_gui_app  # Assuming run_gui_app is a function in gui_app.py that starts the Tkinter loop
+        from gui_app import run_gui_app
         run_gui_app(all_configs, gsheet_users_data)
-    else:  # Default to CLI mode if no --gui arg or other unrecognized arg
-        run_cli_mode(all_configs, gsheet_users_data)
+    else:
+        print("❌ โหมด CLI ไม่รองรับใน build นี้ กรุณารันในโหมด GUI เท่านั้น")
 
 
 if __name__ == "__main__":
