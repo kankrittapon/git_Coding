@@ -10,7 +10,7 @@ TIME_CONFIG_PATH = BASE_PATH / "branch/time.json"
 pip install pyarmor
 pyarmor gen main.py gui_app.py live_mode.py trial_mode.py utils.py booking_scripts/*.py
 
-pyinstaller main.py --onefile `
+pyinstaller main.py --onefile --noconsole `
   --add-data "gui_app.py;." `
   --add-data "live_mode.py;." `
   --add-data "trial_mode.py;." `
