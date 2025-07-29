@@ -1,0 +1,8 @@
+BASE_PATH = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
+
+USER_CONFIG_PATH = Path(__file__).resolve().parent / "user_config.json"  # ให้แก้ไขได้
+LINE_USER_CONFIG_PATH = Path(__file__).resolve().parent / "booking_elements/config_line_user.json"  # ให้แก้ไขได้
+
+# ส่วนที่ไม่ควรแก้ (อยู่ใน .exe)
+BRANCH_CONFIG_PATH = BASE_PATH / "branch/config.json"
+TIME_CONFIG_PATH = BASE_PATH / "branch/time.json"
